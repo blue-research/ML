@@ -1,3 +1,5 @@
 
 *.parquet
 hands-on-machine-learning/my_model.pkl
+*.jpg
+*.jpeg
