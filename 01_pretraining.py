@@ -34,6 +34,21 @@ print(tokenizer.decode(tokens))
 for t in tokens:
     print(f"{t}\t -> {tokenizer.decode([t])}")
 
+# from transformers import AutoTokenizer # pip install transformers
+
+# tokenizer = AutoTokenizer.from_pretrained("LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct")  # KoGPT2 사용
+# # tokenizer = AutoTokenizer.from_pretrained("skt/kogpt2-base-v2")  # KoGPT2 사용
+
+# print("Vocab size :", len(tokenizer))
+
+# text = "대사께서는 도(道)를 얻은 모양이구려."
+
+# tokens = tokenizer.encode(text)
+
+# print(len(text), len(tokens))
+# print(tokens)
+# print(tokenizer.decode(tokens))
+
 for char in text:
     token_ids = tokenizer.encode(char)     # 한 글자씩 인코딩(토큰화)
     decoded = tokenizer.decode(token_ids)  # 한 글자씩 디코딩
@@ -64,11 +79,14 @@ class MyDataset(Dataset):
     def __getitem__(self, idx):
         return self.input_ids[idx], self.target_ids[idx]
 
-# with open("cleaned_한글문서.txt", 'r', encoding='utf-8-sig') as file: # 선택: -sig를 붙여서 BOM 제거
-with open("harry/02 Harry Potter and the Chamber of Secrets.txt_cleaned", 'r', encoding='utf-8-sig') as file: # 선택: -sig를 붙여서 BOM 제거
-    txt = file.read()
+# Aggregate all cleaned texts from Harry Potter and Alice
+texts = []
+for filename in filenames_list[:2]:
+    with open(filename + "_cleaned", 'r', encoding='utf-8-sig') as file:  # 선택: -sig를 붙여서 BOM 제거
+        texts.append(file.read())
+txt = "\n".join(texts)
 
-dataset = MyDataset(txt, max_length = 32, stride = 4)
+dataset = MyDataset(txt, max_length=32, stride=4)
 
 train_loader = DataLoader(dataset, batch_size=128, shuffle=True, drop_last=True)
 
@@ -243,11 +261,13 @@ tokens_seen, global_step = 0, -1
 
 losses = []
 
-for epoch in range(100):
+NUM_EPOCHS = 100
+for epoch in range(NUM_EPOCHS):
     model.train()  # Set model to training mode
     
     epoch_loss = 0
-    for input_batch, target_batch in train_loader:
+    print(f"Epoch {epoch + 1}/{NUM_EPOCHS} - starting ({len(train_loader)} batches)")
+    for step_idx, (input_batch, target_batch) in enumerate(train_loader, start=1):
         optimizer.zero_grad() # Reset loss gradients from previous batch iteration
         input_batch, target_batch = input_batch.to(device), target_batch.to(device)
 
@@ -259,14 +279,18 @@ for epoch in range(100):
         tokens_seen += input_batch.numel()
         global_step += 1
 
+        # Periodic progress logging
+        if step_idx == 1 or step_idx % 50 == 0 or step_idx == len(train_loader):
+            print(f"Epoch {epoch + 1}/{NUM_EPOCHS} Step {step_idx}/{len(train_loader)} | global_step={global_step} | tokens_seen={tokens_seen}")
         if global_step % 1000 == 0:
-            print(f"Tokens seen: {tokens_seen}")
+            print(f"[Milestone] Epoch {epoch + 1}/{NUM_EPOCHS} Step {step_idx}/{len(train_loader)} | tokens_seen={tokens_seen}")
         # Optional evaluation step
 
     avg_loss = epoch_loss / len(train_loader)
     losses.append(avg_loss)
     print(f"Epoch: {epoch + 1}, Loss: {avg_loss}")
-    torch.save(model.state_dict(), "model_" + str(epoch + 1).zfill(3) + ".pth")
+    if epoch==99:
+        torch.save(model.state_dict(), "model_" + str(epoch + 1).zfill(3) + ".pth")
 
 # 주의: 여기서는 편의상 모든 데이터를 train에 사용하였습니다. 
 #      ML에서는 일부 데이터를 validation에 사용하는 것이 일반적입니다.
@@ -331,7 +355,8 @@ def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=No
 
     return idx
 
-start_context = input("Start context: ")
+# start_context = input("Start context: ")
+start_context = "Harry, you are a"
 
 # idx = tokenizer.encode(start_context, allowed_special={'<|endoftext|>'})
 idx = tokenizer.encode(start_context)
