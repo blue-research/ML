@@ -6,3 +6,5 @@ hands-on-machine-learning/my_model.pkl
 *.jpeg
 intro_ml_lecture_slides.zip
 *.sbatch
+*.pth
+
